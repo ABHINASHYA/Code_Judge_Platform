@@ -30,7 +30,9 @@ public class LeaderboardService {
 
 		for (Submission submission : submissions) {
 
-			if (!"Accepted".equals(submission.getVerdict()))
+			if (!isAccepted(submission))
+				continue;
+			if (submission.getUserId() == null || submission.getProblemId() == null)
 				continue;
 
 			solvedProblems
@@ -51,11 +53,27 @@ public class LeaderboardService {
 					new LeaderboardEntry(
 							userId,
 							user.getUsername(),
-							solvedProblems.get(userId).size()));
+							solvedProblems.get(userId).size(),
+							submissionRepository.countByUserId(userId)));
 		}
 
-		leaderboard.sort((a, b) -> Long.compare(b.getProblemsSolved(), a.getProblemsSolved()));
+		leaderboard.sort((a, b) -> {
+			int solvedCompare = Long.compare(b.getProblemsSolved(), a.getProblemsSolved());
+			if (solvedCompare != 0) {
+				return solvedCompare;
+			}
+			return Long.compare(a.getSubmissionCount(), b.getSubmissionCount());
+		});
 
 		return leaderboard;
+	}
+
+	private boolean isAccepted(Submission submission) {
+		if (submission == null) {
+			return false;
+		}
+		String status = submission.getStatus() == null ? "" : submission.getStatus().trim();
+		String verdict = submission.getVerdict() == null ? "" : submission.getVerdict().trim();
+		return "ACCEPTED".equalsIgnoreCase(status) || "Accepted".equalsIgnoreCase(verdict);
 	}
 }

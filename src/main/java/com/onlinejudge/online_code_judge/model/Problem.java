@@ -1,5 +1,7 @@
 package com.onlinejudge.online_code_judge.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.*;
 import java.util.List;
 
@@ -19,6 +21,8 @@ public class Problem {
 
 	private String difficulty; // EASY, MEDIUM, HARD
 
+	// Avoid recursive/lazy serialization for entity responses.
+	@JsonIgnore
 	@OneToMany(mappedBy = "problem", cascade = CascadeType.ALL)
 	private List<TestCase> testCases;
 

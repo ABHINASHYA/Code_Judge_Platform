@@ -9,8 +9,12 @@ public interface SubmissionRepository extends JpaRepository<Submission, Long> {
 
 	List<Submission> findByUserId(Long userId);
 
+	List<Submission> findByStatus(String status);
+
 	long countByUserId(Long userId);
 
 	long countByUserIdAndVerdict(Long userId, String verdict);
+
+	void deleteByProblemId(Long problemId);
 
 }

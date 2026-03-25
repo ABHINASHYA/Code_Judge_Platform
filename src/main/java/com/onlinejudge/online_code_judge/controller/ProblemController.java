@@ -5,6 +5,9 @@ import com.onlinejudge.online_code_judge.service.ProblemService;
 
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpStatus;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/problems")
@@ -35,5 +38,17 @@ public class ProblemController {
 	@GetMapping("/{id}")
 	public Problem getProblem(@PathVariable Long id) {
 		return problemService.getProblemById(id);
+	}
+
+	@PutMapping("/{id}")
+	public Problem updateProblem(@PathVariable Long id, @RequestBody Problem problem) {
+		return problemService.updateProblem(id, problem);
+	}
+
+	@DeleteMapping("/{id}")
+	@ResponseStatus(HttpStatus.OK)
+	public Map<String, String> deleteProblem(@PathVariable Long id) {
+		problemService.deleteProblem(id);
+		return Map.of("message", "Problem deleted");
 	}
 }

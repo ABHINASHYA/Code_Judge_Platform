@@ -1,5 +1,7 @@
 package com.onlinejudge.online_code_judge.security;
 
+import com.onlinejudge.online_code_judge.repository.UserRepository;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -13,14 +15,17 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
 	private final JwtUtil jwtUtil;
+	private final UserRepository userRepository;
 
-	public JwtAuthenticationFilter(JwtUtil jwtUtil) {
+	public JwtAuthenticationFilter(JwtUtil jwtUtil, UserRepository userRepository) {
 		this.jwtUtil = jwtUtil;
+		this.userRepository = userRepository;
 	}
 
 	@Override
@@ -51,7 +56,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		if (jwtUtil.validateToken(token)) {
 
 			String username = jwtUtil.extractUsername(token);
-			String role = jwtUtil.extractUsername(token);
+			String role = userRepository.findByUsername(username)
+					.or(() -> userRepository.findByEmail(username))
+					.map(user -> user.getRole())
+					.orElseGet(() -> jwtUtil.extractRole(token));
+			role = normalizeRole(role);
 
 			UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
 					username,
@@ -62,5 +71,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		}
 
 		filterChain.doFilter(request, response);
+	}
+
+	private String normalizeRole(String role) {
+		String resolvedRole = role == null ? "USER" : role.trim();
+		if (resolvedRole.startsWith("ROLE_")) {
+			resolvedRole = resolvedRole.substring(5);
+		}
+		if (resolvedRole.isBlank()) {
+			return "USER";
+		}
+		return resolvedRole.toUpperCase(Locale.ROOT);
 	}
 }

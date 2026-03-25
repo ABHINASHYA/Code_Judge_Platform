@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class JudgeWorker {
@@ -46,42 +47,64 @@ public class JudgeWorker {
 
 				while (true) {
 
+					Submission submission = null;
 					try {
 
-						Submission submission = submissionQueue.takeSubmission();
+						submission = submissionQueue.takeSubmission();
 
 						List<TestCase> testCases = testCaseRepository.findByProblemId(submission.getProblemId());
 
 						String verdict = "Accepted";
+						long totalRuntimeMs = 0L;
+						submission.setFailedInput(null);
+						submission.setExpectedOutput(null);
+						submission.setActualOutput(null);
 
 						for (TestCase tc : testCases) {
+							long startNanos = System.nanoTime();
 
 							String output = executionService.executeCode(
 									submission.getCode(),
 									tc.getInputData(),
 									submission.getLanguage());
+							long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+							totalRuntimeMs += Math.max(elapsedMs, 0L);
 
-							if (output.equals("Compilation Error")
-									|| output.equals("Runtime Error")
-									|| output.equals("Time Limit Exceeded")) {
+							if (output.startsWith("Compilation Error")
+									|| output.startsWith("Runtime Error")
+									|| output.startsWith("Time Limit Exceeded")
+									|| output.startsWith("Internal Error")) {
 
 								verdict = output;
+								submission.setFailedInput(clipText(tc.getInputData()));
+								submission.setExpectedOutput(clipText(tc.getExpectedOutput()));
+								submission.setActualOutput(clipText(output));
 								break;
 							}
 
 							if (!output.trim().equals(tc.getExpectedOutput().trim())) {
 								verdict = "Wrong Answer";
+								submission.setFailedInput(clipText(tc.getInputData()));
+								submission.setExpectedOutput(clipText(tc.getExpectedOutput()));
+								submission.setActualOutput(clipText(output));
 								break;
 							}
 						}
 
 						submission.setVerdict(verdict);
-						submission.setStatus("Finished");
+						submission.setStatus(mapVerdictToStatus(verdict));
+						submission.setRuntime(totalRuntimeMs);
 
 						submissionRepository.save(submission);
 
 					} catch (Exception e) {
 						e.printStackTrace();
+						if (submission != null) {
+							submission.setVerdict("Internal Error");
+							submission.setStatus("INTERNAL_ERROR");
+							submission.setActualOutput(clipText(e.getMessage()));
+							submissionRepository.save(submission);
+						}
 					}
 
 				}
@@ -90,5 +113,42 @@ public class JudgeWorker {
 
 		}
 
+	}
+
+	private String mapVerdictToStatus(String verdict) {
+		if (verdict == null) {
+			return "INTERNAL_ERROR";
+		}
+		if ("Accepted".equalsIgnoreCase(verdict)) {
+			return "ACCEPTED";
+		}
+		if ("Wrong Answer".equalsIgnoreCase(verdict)) {
+			return "WRONG_ANSWER";
+		}
+		if (verdict.startsWith("Time Limit Exceeded")) {
+			return "TLE";
+		}
+		if (verdict.startsWith("Runtime Error")) {
+			return "RUNTIME_ERROR";
+		}
+		if (verdict.startsWith("Compilation Error")) {
+			return "COMPILE_ERROR";
+		}
+		if (verdict.startsWith("Internal Error")) {
+			return "INTERNAL_ERROR";
+		}
+		return "INTERNAL_ERROR";
+	}
+
+	private String clipText(String value) {
+		if (value == null) {
+			return null;
+		}
+		String trimmed = value.trim();
+		int maxLen = 3000;
+		if (trimmed.length() > maxLen) {
+			return trimmed.substring(0, maxLen) + "...";
+		}
+		return trimmed;
 	}
 }
