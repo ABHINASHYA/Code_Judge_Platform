@@ -4,9 +4,13 @@ import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -19,9 +23,16 @@ import jakarta.servlet.http.HttpServletResponse;
 public class SecurityConfig {
 
 	private final JwtAuthenticationFilter jwtFilter;
+	private final List<String> corsAllowedOriginPatterns;
 
-	public SecurityConfig(JwtAuthenticationFilter jwtFilter) {
+	public SecurityConfig(
+			JwtAuthenticationFilter jwtFilter,
+			@Value("${app.cors.allowed-origin-patterns:http://localhost:*,http://127.0.0.1:*,https://*.up.railway.app,https://*.railway.app,https://*.vercel.app}") String allowedOriginsCsv) {
 		this.jwtFilter = jwtFilter;
+		this.corsAllowedOriginPatterns = java.util.Arrays.stream(allowedOriginsCsv.split(","))
+				.map(String::trim)
+				.filter(value -> !value.isBlank())
+				.toList();
 	}
 
 	@Bean
@@ -30,12 +41,15 @@ public class SecurityConfig {
 		http
 				.csrf(csrf -> csrf.disable())
 				.cors(Customizer.withDefaults())
+				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
 				.authorizeHttpRequests(auth -> auth
+						.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
 						// Public APIs
 						.requestMatchers(
 								"/api/auth/**",
+								"/ping",
 								"/error",
 								"/api/users/register")
 						.permitAll()
@@ -47,23 +61,25 @@ public class SecurityConfig {
 						.hasRole("ADMIN")
 						.requestMatchers(HttpMethod.DELETE, "/api/problems/**", "/api/testcases/**")
 						.hasRole("ADMIN")
-						.requestMatchers(HttpMethod.OPTIONS, "/**")
-						.permitAll()
 
 						// User APIs
 						.anyRequest().authenticated())
 				.exceptionHandling(ex -> ex
-						.authenticationEntryPoint((request, response, authException) -> response.sendError(
-								HttpServletResponse.SC_UNAUTHORIZED,
+						.authenticationEntryPoint((request, response, authException) -> writeJsonError(
+								response,
+								HttpStatus.UNAUTHORIZED.value(),
 								"Unauthorized"))
-						.accessDeniedHandler((request, response, accessDeniedException) -> response.sendError(
-								HttpServletResponse.SC_FORBIDDEN,
+						.accessDeniedHandler((request, response, accessDeniedException) -> writeJsonError(
+								response,
+								HttpStatus.FORBIDDEN.value(),
 								"Forbidden")))
 
 				.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
 
 				.formLogin(form -> form.disable())
-				.httpBasic(basic -> basic.disable());
+				.httpBasic(basic -> basic.disable())
+				.requestCache(cache -> cache.disable())
+				.logout(logout -> logout.disable());
 
 		return http.build();
 	}
@@ -71,33 +87,20 @@ public class SecurityConfig {
 	@Bean
 	public CorsConfigurationSource corsConfigurationSource() {
 		CorsConfiguration configuration = new CorsConfiguration();
-		configuration.setAllowedOriginPatterns(List.of(
-				"http://localhost:*",
-				"http://127.0.0.1:*",
-				"http://192.168.*:*",
-				"http://10.*:*",
-				"http://172.16.*:*",
-				"http://172.17.*:*",
-				"http://172.18.*:*",
-				"http://172.19.*:*",
-				"http://172.20.*:*",
-				"http://172.21.*:*",
-				"http://172.22.*:*",
-				"http://172.23.*:*",
-				"http://172.24.*:*",
-				"http://172.25.*:*",
-				"http://172.26.*:*",
-				"http://172.27.*:*",
-				"http://172.28.*:*",
-				"http://172.29.*:*",
-				"http://172.30.*:*",
-				"http://172.31.*:*"));
+		configuration.setAllowedOriginPatterns(corsAllowedOriginPatterns);
 		configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 		configuration.setAllowedHeaders(List.of("*"));
-		configuration.setAllowCredentials(true);
+		configuration.setExposedHeaders(List.of("Authorization"));
+		configuration.setAllowCredentials(false);
 
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**", configuration);
 		return source;
+	}
+
+	private void writeJsonError(HttpServletResponse response, int status, String message) throws java.io.IOException {
+		response.setStatus(status);
+		response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+		response.getWriter().write("{\"status\":" + status + ",\"error\":\"" + message + "\"}");
 	}
 }
