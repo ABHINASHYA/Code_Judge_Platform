@@ -58,13 +58,14 @@ public class UserService {
 
 		user.setUsername(username);
 		user.setEmail(email);
-		user.setPassword(passwordEncoder.encode(password));
+		user.setPassword(passwordEncoder.encode(user.getPassword()));
 		user.setRole("USER");
 
 		try {
 			return userRepository.save(user);
 		} catch (DataIntegrityViolationException ex) {
-			// Race-condition safety: convert DB unique constraint failure into a client error.
+			// Race-condition safety: convert DB unique constraint failure into a client
+			// error.
 			throw new ResponseStatusException(HttpStatus.CONFLICT, "Username or email already exists");
 		}
 	}
