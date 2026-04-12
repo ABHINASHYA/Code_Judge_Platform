@@ -47,6 +47,21 @@ public class GlobalExceptionHandler {
 		return build(HttpStatus.BAD_REQUEST, "Malformed JSON request body", request.getRequestURI());
 	}
 
+	@ExceptionHandler(IllegalArgumentException.class)
+	public ResponseEntity<Map<String, Object>> handleIllegalArgument(
+			IllegalArgumentException ex,
+			HttpServletRequest request) {
+		return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI());
+	}
+
+	@ExceptionHandler(Judge0IntegrationException.class)
+	public ResponseEntity<Map<String, Object>> handleJudge0Integration(
+			Judge0IntegrationException ex,
+			HttpServletRequest request) {
+		log.error("Judge0 integration error on {} {}", request.getMethod(), request.getRequestURI(), ex);
+		return build(HttpStatus.BAD_GATEWAY, ex.getMessage(), request.getRequestURI());
+	}
+
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<Map<String, Object>> handleUnexpected(
 			Exception ex,

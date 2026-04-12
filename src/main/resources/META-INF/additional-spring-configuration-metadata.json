@@ -4,6 +4,36 @@
 			"name": "jwt.secret",
 			"type": "java.lang.String",
 			"description": "A description for 'jwt.secret'"
+		},
+		{
+			"name": "judge0.base-url",
+			"type": "java.lang.String",
+			"description": "Judge0 API base URL"
+		},
+		{
+			"name": "judge0.submission-path",
+			"type": "java.lang.String",
+			"description": "Judge0 submissions endpoint path"
+		},
+		{
+			"name": "judge0.rapid-api-key",
+			"type": "java.lang.String",
+			"description": "RapidAPI key for Judge0"
+		},
+		{
+			"name": "judge0.rapid-api-host",
+			"type": "java.lang.String",
+			"description": "RapidAPI host header for Judge0"
+		},
+		{
+			"name": "judge0.connect-timeout",
+			"type": "java.time.Duration",
+			"description": "Judge0 HTTP client connect timeout"
+		},
+		{
+			"name": "judge0.read-timeout",
+			"type": "java.time.Duration",
+			"description": "Judge0 HTTP client read timeout"
 		}
 	]
 }
